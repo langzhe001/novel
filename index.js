@@ -2,7 +2,7 @@ import JSZip from 'jszip';
 
 /**
  * ============================================
- * 🎨 前端 UI 页面 (HTML/CSS/JS)
+ * 🎨 前端 UI (支持文件上传)
  * ============================================
  */
 const HTML_UI = `
@@ -11,105 +11,133 @@ const HTML_UI = `
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Cloudflare 小说拆分器</title>
+<title>小说章节拆分器 (文件上传版)</title>
 <style>
-    :root { --primary: #2563eb; --bg: #f8fafc; --surface: #ffffff; --text: #334155; }
-    body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--text); display: flex; justify-content: center; padding: 20px; margin: 0; }
-    .container { background: var(--surface); padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); width: 100%; max-width: 600px; }
-    h1 { text-align: center; color: #1e293b; margin-bottom: 1.5rem; }
-    label { display: block; font-weight: 600; margin-bottom: 0.5rem; margin-top: 1rem; }
-    input, textarea { width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-family: inherit; }
-    input:focus, textarea:focus { outline: 2px solid var(--primary); border-color: transparent; }
-    .row { display: flex; gap: 1rem; }
-    .col { flex: 1; }
-    button { width: 100%; background: var(--primary); color: white; padding: 1rem; border: none; border-radius: 6px; font-weight: bold; margin-top: 2rem; cursor: pointer; transition: 0.2s; }
-    button:hover { background: #1d4ed8; }
-    button:disabled { background: #94a3b8; cursor: not-allowed; }
-    #status { margin-top: 1rem; padding: 1rem; border-radius: 6px; display: none; text-align: center; }
-    .success { background: #dcfce7; color: #166534; }
+    :root { --primary: #0f766e; --bg: #f0fdfa; --surface: #ffffff; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: #333; display: flex; justify-content: center; padding: 20px; }
+    .container { background: var(--surface); padding: 2rem; border-radius: 12px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); width: 100%; max-width: 500px; }
+    h1 { text-align: center; color: #115e59; margin-bottom: 1.5rem; font-size: 1.5rem; }
+    
+    .form-group { margin-bottom: 1.25rem; }
+    label { display: block; font-weight: 600; margin-bottom: 0.5rem; color: #374151; }
+    
+    /* 文件上传样式 */
+    .file-upload { border: 2px dashed #cbd5e1; border-radius: 8px; padding: 20px; text-align: center; cursor: pointer; transition: 0.2s; }
+    .file-upload:hover { border-color: var(--primary); background: #f0fdfa; }
+    input[type="file"] { display: none; }
+    #fileName { margin-top: 10px; color: var(--primary); font-weight: bold; font-size: 0.9rem; }
+
+    input[type="text"], input[type="number"] { width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; }
+    
+    button { width: 100%; background: var(--primary); color: white; padding: 1rem; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 1rem; margin-top: 1rem; }
+    button:hover { background: #0d9488; }
+    button:disabled { background: #94a3b8; cursor: wait; }
+
+    #status { margin-top: 1rem; padding: 0.75rem; border-radius: 6px; display: none; text-align: center; font-size: 0.9rem; }
     .error { background: #fee2e2; color: #991b1b; }
-    .hint { font-size: 0.85rem; color: #64748b; margin-top: 0.25rem; }
+    .success { background: #dcfce7; color: #166534; }
 </style>
 </head>
 <body>
 <div class="container">
-    <h1>📚 小说章节拆分打包器</h1>
-    <form id="appForm">
-        <label>方式一：粘贴文本</label>
-        <textarea id="text" rows="6" placeholder="在此粘贴小说内容..."></textarea>
-
-        <label>方式二：TXT 下载链接 (可选)</label>
-        <input type="url" id="url" placeholder="https://example.com/novel.txt">
-        <div class="hint">如果填写了链接，将忽略上方粘贴的文本。</div>
-
-        <div class="row">
-            <div class="col">
-                <label>每多少章打包</label>
-                <input type="number" id="split" value="50" min="1">
-            </div>
-            <div class="col">
-                <label>拆分后格式</label>
-                <input type="text" value=".txt" disabled>
+    <h1>📄 TXT 小说拆分打包</h1>
+    <form id="uploadForm">
+        
+        <div class="form-group">
+            <label>上传小说文件 (.txt)</label>
+            <div class="file-upload" onclick="document.getElementById('fileInput').click()">
+                <span id="uploadText">点击选择文件</span>
+                <input type="file" id="fileInput" accept=".txt" required>
+                <div id="fileName"></div>
             </div>
         </div>
 
-        <label>章节识别正则</label>
-        <input type="text" id="regex" value="(第[零一二三四五六七八九十百千万0-9]+章[^\\n]*)">
-        <div class="hint">默认可识别：第1章、第一章、第一百章 标题</div>
+        <div class="form-group">
+            <label>拆分设置</label>
+            <div style="display: flex; gap: 10px;">
+                <div style="flex:1">
+                    <input type="number" id="splitCount" value="50" placeholder="每50章">
+                    <div style="font-size:12px; color:#666; margin-top:4px;">每多少章</div>
+                </div>
+                <div style="flex:2">
+                    <input type="text" id="regex" value="(第[零一二三四五六七八九十百千万0-9]+章[^\\n]*)">
+                    <div style="font-size:12px; color:#666; margin-top:4px;">章节正则</div>
+                </div>
+            </div>
+        </div>
 
-        <button type="submit" id="btn">🚀 开始拆分并下载 ZIP</button>
+        <button type="submit" id="submitBtn">开始处理并下载</button>
     </form>
     <div id="status"></div>
 </div>
 
 <script>
-    document.getElementById('appForm').addEventListener('submit', async (e) => {
+    const fileInput = document.getElementById('fileInput');
+    const fileNameDisplay = document.getElementById('fileName');
+    
+    // 显示选中的文件名
+    fileInput.addEventListener('change', (e) => {
+        if (fileInput.files.length > 0) {
+            fileNameDisplay.textContent = "已选: " + fileInput.files[0].name;
+            document.getElementById('uploadText').textContent = "更换文件";
+        }
+    });
+
+    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const btn = document.getElementById('btn');
-        const status = document.getElementById('status');
-        const textVal = document.getElementById('text').value;
-        const urlVal = document.getElementById('url').value;
         
-        if (!textVal && !urlVal) {
-            alert('请粘贴文本或提供下载链接！');
+        if (fileInput.files.length === 0) {
+            alert('请先选择一个 TXT 文件！');
             return;
         }
 
+        const btn = document.getElementById('submitBtn');
+        const status = document.getElementById('status');
+        
         btn.disabled = true;
-        btn.innerText = '处理中 (大文件可能需要几十秒)...';
+        btn.textContent = '正在上传处理...';
         status.style.display = 'none';
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        formData.append('split', document.getElementById('splitCount').value);
+        formData.append('regex', document.getElementById('regex').value);
 
         try {
             const res = await fetch(window.location.href, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    text: textVal,
-                    url: urlVal,
-                    split: document.getElementById('split').value,
-                    regex: document.getElementById('regex').value
-                })
+                body: formData
             });
 
-            if (!res.ok) throw new Error(await res.text());
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(errText);
+            }
 
-            // 触发下载
+            // 下载文件
             const blob = await res.blob();
-            const link = document.createElement('a');
-            link.href = window.URL.createObjectURL(blob);
-            link.download = "novel_chapters.zip";
-            link.click();
-
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            // 获取上传的文件名（去掉后缀）
+            let originalName = fileInput.files[0].name.replace(/\.[^/.]+$/, "");
+            a.download = \`\${originalName}_split.zip\`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            
             status.className = 'success';
-            status.innerText = '✅ 成功！下载已开始。';
+            status.textContent = '✅ 处理完成！已自动下载';
             status.style.display = 'block';
-        } catch (err) {
+
+        } catch (error) {
+            console.error(error);
             status.className = 'error';
-            status.innerText = '❌ 错误: ' + err.message;
+            status.textContent = '❌ 失败: ' + error.message;
             status.style.display = 'block';
         } finally {
             btn.disabled = false;
-            btn.innerText = '🚀 开始拆分并下载 ZIP';
+            btn.textContent = '开始处理并下载';
         }
     });
 </script>
@@ -119,87 +147,99 @@ const HTML_UI = `
 
 /**
  * ============================================
- * ⚙️ 后端逻辑 (Worker)
+ * ⚙️ 后端逻辑 (处理 FormData)
  * ============================================
  */
 export default {
     async fetch(request, env, ctx) {
-        // 1. GET 请求：返回前端页面
+        // 1. GET: 返回界面
         if (request.method === 'GET') {
             return new Response(HTML_UI, {
                 headers: { 'Content-Type': 'text/html; charset=utf-8' }
             });
         }
 
-        // 2. POST 请求：处理拆分逻辑
+        // 2. POST: 处理文件
         if (request.method === 'POST') {
             try {
-                const body = await request.json();
-                let fullText = body.text || "";
+                // 解析 Multipart FormData
+                const formData = await request.formData();
+                const file = formData.get('file');
+                const splitStr = formData.get('split');
+                const regexStr = formData.get('regex');
 
-                // 如果有 URL，优先下载 URL 内容
-                if (body.url) {
-                    const dlRes = await fetch(body.url);
-                    if (!dlRes.ok) throw new Error("无法下载该链接的文件");
-                    fullText = await dlRes.text();
+                if (!file || !(file instanceof File)) {
+                    throw new Error("请上传有效的 txt 文件");
                 }
 
-                if (!fullText) throw new Error("没有内容可拆分");
+                // 读取文件内容 (Cloudflare Worker 支持 blob.text())
+                // 注意：默认按 UTF-8 读取。如果小说是 GBK 编码可能会乱码，
+                // 现在的浏览器和编辑器大多默认 UTF-8，这里不做复杂编码检测。
+                const text = await file.text();
 
-                // 识别章节
-                // 我们给正则加上 'g' 标志，并尝试分割
-                const regexStr = body.regex || "(第[零一二三四五六七八九十百千万0-9]+章[^\\n]*)";
-                const regex = new RegExp(regexStr, 'g');
+                // 正则处理
+                const safeRegex = regexStr || "(第[零一二三四五六七八九十百千万0-9]+章[^\\n]*)";
+                const regex = new RegExp(safeRegex, 'g');
                 
-                // 使用 split 分割，保留捕获组（章节名）
-                // split结果通常是: [前言, 章节名1, 内容1, 章节名2, 内容2...]
-                const parts = fullText.split(regex);
-                
+                // 拆分逻辑
+                const parts = text.split(regex);
                 const chapters = [];
-                // 如果第一个部分有内容但不是章节名（如序章前的内容），归为“前言”
+                
+                // 处理“前言” (正则匹配前的部分)
                 if (parts[0] && parts[0].trim()) {
-                    chapters.push({ title: "000_前言", content: parts[0] });
+                    chapters.push({ title: "序章/前言", content: parts[0] });
                 }
 
+                // 提取章节 (split 保留捕获组，结构为 [前文, 标题1, 内容1, 标题2, 内容2...])
                 for (let i = 1; i < parts.length; i += 2) {
-                    const title = (parts[i] || "未知章节").trim();
+                    const title = (parts[i] || "").trim();
                     const content = (parts[i+1] || "").trim();
-                    if (content) {
+                    if (title && content) {
                         chapters.push({ title, content });
                     }
                 }
 
-                if (chapters.length === 0) throw new Error("未识别到任何章节，请检查正则表达式");
-
-                // 分组并打包
-                const splitSize = parseInt(body.split) || 50;
-                const zip = new JSZip();
-                
-                for (let i = 0; i < chapters.length; i += splitSize) {
-                    const group = chapters.slice(i, i + splitSize);
-                    const groupTitle = `Part_${Math.floor(i/splitSize)+1}_${group[0].title}_to_${group[group.length-1].title}.txt`;
-                    
-                    // 过滤文件名中的非法字符
-                    const safeTitle = groupTitle.replace(/[\\/:*?"<>|]/g, '_');
-                    
-                    // 拼接内容
-                    const fileContent = group.map(c => `${c.title}\n\n${c.content}\n\n`).join("- - - - -\n\n");
-                    
-                    zip.file(safeTitle, fileContent);
+                if (chapters.length === 0) {
+                    // 如果没识别到章节，可能是正则不对，或者整个文件就是一章
+                    // 这种情况下把整个文件当作一章
+                    chapters.push({ title: "全文", content: text });
                 }
 
-                // 生成二进制流
+                // 打包逻辑
+                const splitSize = parseInt(splitStr) || 50;
+                const zip = new JSZip();
+
+                for (let i = 0; i < chapters.length; i += splitSize) {
+                    const group = chapters.slice(i, i + splitSize);
+                    
+                    // 计算当前分卷的起始章节序号 (从1开始)
+                    const startIdx = i + 1;
+                    const endIdx = i + group.length;
+                    
+                    // 计算分卷号 (Part Index)，从1开始
+                    const partNum = Math.floor(i / splitSize) + 1;
+
+                    // 规范化文件名: px-0-50.txt (实际逻辑改为 p卷号-起始章-结束章)
+                    // 例如: p1-1-50.txt
+                    const filename = `p${partNum}-${startIdx}-${endIdx}.txt`;
+
+                    // 拼接内容
+                    const fileContent = group.map(c => `${c.title}\n\n${c.content}\n\n`).join("\n\n");
+                    
+                    zip.file(filename, fileContent);
+                }
+
                 const zipBlob = await zip.generateAsync({ type: "blob" });
 
                 return new Response(zipBlob, {
                     headers: {
                         'Content-Type': 'application/zip',
-                        'Content-Disposition': 'attachment; filename="novel_chapters.zip"'
+                        'Content-Disposition': 'attachment; filename="download.zip"'
                     }
                 });
 
             } catch (err) {
-                return new Response(err.message, { status: 400 });
+                return new Response("处理出错: " + err.message, { status: 500 });
             }
         }
 
